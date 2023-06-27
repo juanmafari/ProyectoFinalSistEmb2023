@@ -1,8 +1,5 @@
-<<<<<<< HEAD
 Commit inicial para testeo. Actualizacion1. Actualizacion 2. act 3
 commit 2
-=======
 Commit inicial para testeo. Actualizacion1.
 Commit segundo para testeo. Actualizacion2.
 Commit tercero para testeo. Actualizacion3.
->>>>>>> 1f91df6604c5d61fdf838028c222cde8e3a1e8c9
