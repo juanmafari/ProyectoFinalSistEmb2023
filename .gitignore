@@ -1176,3 +1176,12 @@ proyefinal2023/build/bootloader-prefix/src/bootloader-stamp/bootloader-install
 proyefinal2023/build/esp-idf/esp_system/ld/sections.ld
 proyefinal2023/build/esp-idf/main/libmain.a
 proyefinal2023/build/esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj
+proyefinal2023/build/esp-idf/mqtt/CMakeFiles/__idf_mqtt.dir/esp-mqtt/mqtt5_client.c.obj
+proyefinal2023/build/esp-idf/mqtt/CMakeFiles/__idf_mqtt.dir/esp-mqtt/lib/mqtt5_msg.c.obj
+proyefinal2023/build/esp-idf/protocol_examples_common/libprotocol_examples_common.a
+proyefinal2023/build/log/idf_py_stderr_output_24628
+proyefinal2023/build/log/idf_py_stderr_output_32384
+proyefinal2023/build/log/idf_py_stderr_output_32868
+proyefinal2023/build/log/idf_py_stdout_output_24628
+proyefinal2023/build/log/idf_py_stdout_output_32384
+proyefinal2023/build/log/idf_py_stdout_output_32868
