@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Configuración de red</title>
+        <style>
+            body, h1 {
+                font-family: "Raleway", Arial, sans-serif;
+            }
+            h1 {
+                letter-spacing: 6px;
+                text-align: center;
+                vertical-align: -50px;
+            }
+            body {
+                background-color: lightgrey;
+                color: rgb(38, 3, 48);
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Conectarse a una red</h1>
+        <form method='POST' action='/config'>
+            <label for='ssid'>Usuario:</label>
+            <input type='text' id='ssid' name='ssid'><br>
+            <label for='password'>Password:</label>
+            <input type='password' id='password' name='password'><br>
+            <input type='submit' value='Conectar'>
+        </form>
+    </body>
+</html>
