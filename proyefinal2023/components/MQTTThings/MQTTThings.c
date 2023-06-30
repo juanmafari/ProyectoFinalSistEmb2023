@@ -19,7 +19,7 @@
 #define BROKER_URL "mqtt://demo.thingsboard.io"
 #define BROKER_PORT 1883
 #define TOPIC "v1/devices/me/telemetry"
-#define BROKER_USER "79p8v7vt7232m1fzff2t"
+#define BROKER_USER "ncjxeg28pxsrauzpwx8v"
 #define BROKER_PASS ""
 
 

@@ -18,9 +18,10 @@
 #include "mqtt_client.h"
 #include "softAPSTA.h"
 #include "MQTTThings.h"
+#include "sensor.h"
 
 
-
+char* TAG = "mainTest";
 
 
 void app_main(void)
@@ -36,11 +37,17 @@ void app_main(void)
     vTaskDelay(10000/portTICK_PERIOD_MS); //delay para esperar conexion a station, mejorar con err check
     mqtt_app_start(); // inicia conexion a mqtt con dashboard de thingsboard predefinido
 
+    init_sensor();
     
 
     while (1){
-
-        publish_telemetry("{\"temperature\": 360.5, \"humidity\": 10.2}");
+        esp_log_level_set("mainTest", ESP_LOG_INFO); 
+        char mensajeThi[50];
+        memset(mensajeThi, 0, 50);
+        uint16_t sensorValue = get_sensor_value();
+        ESP_LOGI("mainTest", "%d %s",sensorValue,mensajeThi);
+        sprintf(mensajeThi,"{\"temperature\": %d, \"humidity\": 300}",sensorValue);
+        publish_telemetry(mensajeThi);
         vTaskDelay(5000/portTICK_PERIOD_MS);
     }
 }
