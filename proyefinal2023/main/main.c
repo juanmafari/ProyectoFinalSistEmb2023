@@ -14,18 +14,33 @@
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
-//#include "mdns.h"
 #include "mqtt_client.h"
 #include "softAPSTA.h"
 #include "MQTTThings.h"
 #include "sensor.h"
-
+#include "esp_sntp.h"
+#include "time.h"
+#include "timeNTP.h"
 
 char* TAG = "mainTest";
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 void app_main(void)
 {
+    esp_log_level_set("mainTest", ESP_LOG_INFO); 
+
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -39,15 +54,21 @@ void app_main(void)
 
     init_sensor();
     
+    sync_time();
+    time_t now;
+    
 
     while (1){
-        esp_log_level_set("mainTest", ESP_LOG_INFO); 
-        char mensajeThi[50];
-        memset(mensajeThi, 0, 50);
+        now = time(NULL); //retrieve current system time, returns seconds since epoch
+        now = now*1000;
+
+        char mensajeThi[90];
+        memset(mensajeThi, 0, 90);
+        
         uint16_t sensorValue = get_sensor_value();
-        ESP_LOGI("mainTest", "%d %s",sensorValue,mensajeThi);
-        sprintf(mensajeThi,"{\"temperature\": %d, \"humidity\": 300}",sensorValue);
+        sprintf(mensajeThi,"{\"ts\": %lld, \"values\":{\"temperature\": %d, \"humidity\": 100}}" , now, sensorValue);
+        
         publish_telemetry(mensajeThi);
-        vTaskDelay(5000/portTICK_PERIOD_MS);
+        vTaskDelay(5000/portTICK_PERIOD_MS); 
     }
 }

@@ -12,7 +12,6 @@
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
-//#include "mdns.h"
 #include "mqtt_client.h"
 #include "MQTTThings.h"
 
@@ -96,7 +95,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 void publish_telemetry( const char* data)
 {
-    esp_mqtt_client_publish(client, TOPIC, data, strlen(data), 0, 0);
+    esp_mqtt_client_publish(client, TOPIC, data, strlen(data), 0, 1);
 }
 
 
@@ -113,10 +112,8 @@ void mqtt_app_start(void)
         .credentials.authentication.password = BROKER_PASS,
         
 
-        //.credentials.client_id = CLIENT_ID,
-        //.event_handler = mqtt_event_handler_cb,
-
     };
+
     client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
