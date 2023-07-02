@@ -20,7 +20,7 @@
    If you'd rather not, just change the below entries to strings with the config you want
    - ie #define EXAMPLE_ESP_WIFI_SSID "mywifissid" */
 
-#define EXAMPLE_ESP_WIFI_SSID_STA      "Robasta"
+#define EXAMPLE_ESP_WIFI_SSID_STA      "robasta"
 #define EXAMPLE_ESP_WIFI_PASS_STA      "roballostabile"
 
 
@@ -165,10 +165,9 @@ esp_err_t config_post_handler(httpd_req_t *req)
         char *ssid_pos = strstr(buf, "ssid=");
         char *password_pos = strstr(buf, "password=");
 
-        if (ssid_pos && password_pos && strstr(buf, "connect=Connect") != NULL) {
+        if (ssid_pos && password_pos) {
             strncpy(usuario, ssid_pos + 5, sizeof(usuario) - 1);
             strncpy(password, password_pos + 9, sizeof(password) - 1);
-            connect_button_pressed = true;
     }
             return ESP_FAIL;  // Datos del formulario incompletos o incorrectos
         }
