@@ -23,7 +23,8 @@
 #include "timeNTP.h"
 
 char* TAG = "mainTest";
-void task_check_data(void* pParam);
+void init_ap(void* pParam);
+void init_sta(void* pParam);
 
 
 
@@ -52,30 +53,30 @@ void app_main(void)
     vTaskDelay(10000/portTICK_PERIOD_MS); //delay para esperar conexion a station, mejorar con err check
     
     TaskHandle_t task_handle;
-    xTaskCreate(task_check_data, "check_data_task", configMINIMAL_STACK_SIZE, NULL, 1, &task_handle);
+    xTaskCreate(init_ap, "init_ap_task", configMINIMAL_STACK_SIZE, NULL, 1, &task_handle);
 
 
-    mqtt_app_start(); // inicia conexion a mqtt con dashboard de thingsboard predefinido
+   // mqtt_app_start(); // inicia conexion a mqtt con dashboard de thingsboard predefinido
 
-    init_sensor();
+   // init_sensor();
     
-    sync_time();
-    time_t now;
+  //  sync_time();
+   // time_t now;
     
 
-    while (1){
-        now = time(NULL); //retrieve current system time, returns seconds since epoch
-        now = now*1000;
+    // while (1){
+    //     now = time(NULL); //retrieve current system time, returns seconds since epoch
+    //     now = now*1000;
 
-        char mensajeThi[90];
-        memset(mensajeThi, 0, 90);
+    //     char mensajeThi[90];
+    //     memset(mensajeThi, 0, 90);
         
-        uint16_t sensorValue = get_sensor_value();
-        //sprintf(mensajeThi,"{\"ts\": %lld, \"values\":{\"temperature\": %d, \"humidity\": 100}}" , now, sensorValue);
+    //     uint16_t sensorValue = get_sensor_value();
+    //     //sprintf(mensajeThi,"{\"ts\": %lld, \"values\":{\"temperature\": %d, \"humidity\": 100}}" , now, sensorValue);
         
-        publish_telemetry(mensajeThi);
-        vTaskDelay(5000/portTICK_PERIOD_MS); 
-        ESP_LOGI(TAG,"RESTARTEEEEO");
-        //esp_restart();
-    }
+    //     publish_telemetry(mensajeThi);
+    //     vTaskDelay(5000/portTICK_PERIOD_MS); 
+    //     ESP_LOGI(TAG,"RESTARTEEEEO");
+    //     //esp_restart();
+    // }
 }

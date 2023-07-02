@@ -51,6 +51,7 @@ static char usuario[32] = "";
 static char password[32] = "";
 bool connect_button_pressed = false;
 
+void init_sta(void *pvParameters);
 
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
@@ -249,6 +250,21 @@ void softapsta(void){
     ESP_LOGI(TAG_AP, "ESP_WIFI_MODE_AP");
     esp_netif_t *esp_netif_ap = wifi_init_softap();
 
+    
+    /* Initialize STA */
+    
+
+    /* Start WiFi */
+    ESP_ERROR_CHECK(esp_wifi_start() );
+
+    ESP_ERROR_CHECK(esp_wifi_stop() );
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+
+    ESP_LOGI(TAG_STA, "ESP_WIFI_MODE_STA");
+    esp_netif_t *esp_netif_sta = wifi_init_sta();
+
+    ESP_ERROR_CHECK(esp_wifi_start() );
 
     /* Set sta as the default interface */
     //esp_netif_set_default_netif(esp_netif_sta);
@@ -261,7 +277,22 @@ void softapsta(void){
 
 }
 
-void task_check_data(void *pvParameters) {
+void init_ap(void *pvParameters){
+
+    while (1) {
+        if (strlen(usuario) > 0 && strlen(password) > 0 && connect_button_pressed) {
+        
+        TaskHandle_t task_handle;
+        xTaskCreate(init_sta, "init_sta_task", configMINIMAL_STACK_SIZE, NULL, 1, &task_handle);
+        vTaskDelete(NULL); // Eliminar la tarea init_ap
+        }
+        
+     vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
+
+void init_sta(void *pvParameters) {
+
     while (1) {
         if (strlen(usuario) > 0 && strlen(password) > 0 && connect_button_pressed) {
 
@@ -273,14 +304,8 @@ void task_check_data(void *pvParameters) {
             esp_netif_t *esp_netif_sta = wifi_init_sta();
 
             ESP_ERROR_CHECK(esp_wifi_start());
+
         }
-        else {ESP_ERROR_CHECK(esp_wifi_stop());
-
-            ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-            ESP_LOGI(TAG_STA, "ESP_WIFI_MODE_APSTA");
-            esp_netif_t *esp_netif_ap = wifi_init_softap();
-            
-            ESP_ERROR_CHECK(esp_wifi_start());}
-
+    
     }
 }
