@@ -1,3 +1,0 @@
-
-
-void softapsta(void);
