@@ -23,7 +23,7 @@
 #include "timeNTP.h"
 
 char* TAG = "mainTest";
-
+void task_check_data(void* pParam);
 
 
 
