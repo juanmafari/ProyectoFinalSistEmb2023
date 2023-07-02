@@ -49,7 +49,6 @@ static EventGroupHandle_t s_wifi_event_group;
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 static char usuario[32] = "";
 static char password[32] = "";
-bool connect_button_pressed = false;
 
 void init_sta(void *pvParameters);
 
@@ -168,12 +167,12 @@ esp_err_t config_post_handler(httpd_req_t *req)
         if (ssid_pos && password_pos) {
             strncpy(usuario, ssid_pos + 5, sizeof(usuario) - 1);
             strncpy(password, password_pos + 9, sizeof(password) - 1);
-    }
+        } else {
             return ESP_FAIL;  // Datos del formulario incompletos o incorrectos
         }
 
         remaining -= ret;
-    
+    }
 
     httpd_resp_send(req, "Datos recibidos", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
@@ -279,7 +278,7 @@ void softapsta(void){
 void init_ap(void *pvParameters){
 
     while (1) {
-        if (strlen(usuario) > 0 && strlen(password) > 0 && connect_button_pressed) {
+        if (strlen(usuario) > 0 && strlen(password) > 0) {
         
         TaskHandle_t task_handle;
         xTaskCreate(init_sta, "init_sta_task", configMINIMAL_STACK_SIZE, NULL, 1, &task_handle);
@@ -293,7 +292,7 @@ void init_ap(void *pvParameters){
 void init_sta(void *pvParameters) {
 
     while (1) {
-        if (strlen(usuario) > 0 && strlen(password) > 0 && connect_button_pressed) {
+        if (strlen(usuario) > 0 && strlen(password) > 0) {
 
             ESP_ERROR_CHECK(esp_wifi_stop() );
 
