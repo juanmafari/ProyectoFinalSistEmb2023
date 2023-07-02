@@ -1346,3 +1346,9 @@ proyefinal2023/build/config/kconfig_menus.json
 proyefinal2023/build/config/sdkconfig.cmake
 proyefinal2023/build/config/sdkconfig.h
 proyefinal2023/build/config/sdkconfig.json
+proyefinal2023ver4/.devcontainer/devcontainer.json
+proyefinal2023ver4/.devcontainer/Dockerfile
+proyefinal2023ver4/.vscode/c_cpp_properties.json
+proyefinal2023ver4/.vscode/launch.json
+proyefinal2023ver4/.vscode/settings.json
+proyefinal2023ver4/.vscode/tasks.json

@@ -83,9 +83,7 @@ esp_netif_t *wifi_init_softap(void)
             .password = EXAMPLE_ESP_WIFI_PASS_AP,
             .max_connection = 4,
             .authmode = WIFI_AUTH_WPA2_PSK,
-            .pmf_cfg = {
-                .required = false,
-            },
+            
         },
     };
 
@@ -265,7 +263,7 @@ void softapsta(void){
     ESP_ERROR_CHECK(esp_wifi_start() );
 
     /* Set sta as the default interface */
-    esp_netif_set_default_netif(esp_netif_sta);
+    //esp_netif_set_default_netif(esp_netif_sta);
 
     /* Enable napt on the AP netif */
     /*if (esp_netif_napt_enable(esp_netif_ap) != ESP_OK) {
