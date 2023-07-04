@@ -2538,3 +2538,6 @@ proyeFinalFinal/.vscode/c_cpp_properties.json
 proyeFinalFinal/.vscode/launch.json
 proyeFinalFinal/.vscode/settings.json
 proyeFinalFinal/.vscode/tasks.json
+proyeFinalFinal/build/esp-idf/JSONfiles/cmake_install.cmake
+proyeFinalFinal/build/esp-idf/JSONfiles/libJSONfiles.a
+proyeFinalFinal/build/esp-idf/JSONfiles/CMakeFiles/__idf_JSONfiles.dir/JSONfiles.c.obj

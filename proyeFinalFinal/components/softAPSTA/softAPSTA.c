@@ -24,7 +24,7 @@
 #define EXAMPLE_ESP_WIFI_PASS_STA      ""
 
 
-#define EXAMPLE_ESP_WIFI_SSID_AP      "kaluga_wifi"
+#define EXAMPLE_ESP_WIFI_SSID_AP      "kaluga_juan"
 #define EXAMPLE_ESP_WIFI_PASS_AP      "kalugaucu1"
 
 #define EXAMPLE_ESP_MAXIMUM_RETRY  20
@@ -57,6 +57,8 @@ char g_password[64] = "";
 char* ssidPr;
 char* passPr;
 
+int connectCheck = 0;
+
 void init_sta(void *pvParameters);
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
@@ -71,6 +73,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
         ESP_LOGI(TAG_STA, "Station started");
+        connectCheck = 1;
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
         ESP_LOGI(TAG_STA, "Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
@@ -248,7 +251,6 @@ void init_sta(void *pvParameters) {
             esp_netif_t *esp_netif_sta = wifi_init_sta();
 
             ESP_ERROR_CHECK(esp_wifi_start());
-            esp_netif_set_default_netif(esp_netif_sta);
             vTaskDelete(NULL);
 
         }
@@ -256,7 +258,10 @@ void init_sta(void *pvParameters) {
     }
 }
 
-void softapsta(void){
+
+
+
+int softapsta(void){
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
@@ -311,5 +316,14 @@ void softapsta(void){
         ESP_LOGE(TAG_STA, "NAPT not enabled on the netif: %p", esp_netif_ap);
     }*/
     start_webserver();
+    while(1){
+        if (connectCheck == 1)
+        {
+            return connectCheck;
+        }
+        
+        vTaskDelay(5000/portTICK_PERIOD_MS);
+    }
+    
 }
 

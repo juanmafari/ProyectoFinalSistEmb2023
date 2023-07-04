@@ -14,6 +14,7 @@
 #include "lwip/netdb.h"
 #include "mqtt_client.h"
 #include "MQTTThings.h"
+#include "cJSON.h"
 
 #define BROKER_URL "mqtt://demo.thingsboard.io"
 #define BROKER_PORT 1883

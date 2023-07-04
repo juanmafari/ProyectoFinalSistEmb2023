@@ -1,1 +1,1 @@
-void softapsta(void);
+int softapsta(void);
