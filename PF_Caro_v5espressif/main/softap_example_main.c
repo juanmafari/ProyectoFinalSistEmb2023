@@ -1,5 +1,12 @@
+/*  WiFi softAP Example
+
+   This example code is in the Public Domain (or CC0 licensed, at your option.)
+
+   Unless required by applicable law or agreed to in writing, this
+   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+   CONDITIONS OF ANY KIND, either express or implied.
+*/
 #include <stdio.h>
-#include "softAPSTA.h"
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -8,29 +15,34 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
-    #include "nvs_flash.h"
-#include "nvs.h" //NUEVA BIBLIOTECA
+#include "nvs_flash.h"
+#include "nvs.h"
 #include "esp_netif.h"
 #include "esp_netif_types.h"
 #include "lwip/ip_addr.h"
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
-#include <esp_http_server.h>
-/* The examples use WiFi configuration that you can set via project configuration menu
-   If you'd rather not, just change the below entries to strings with the config you want
-   - ie #define EXAMPLE_ESP_WIFI_SSID "mywifissid" */
 
+#include "lwip/err.h"
+#include "lwip/sys.h"
+
+#include <esp_http_server.h>
+
+
+/* The examples use WiFi configuration that you can set via project configuration menu.
+
+   If you'd rather not, just change the below entries to strings with
+   the config you want - ie #define EXAMPLE_WIFI_SSID "mywifissid"
+*/
 #define EXAMPLE_ESP_WIFI_SSID_STA      ""
 #define EXAMPLE_ESP_WIFI_PASS_STA      ""
-
 
 #define EXAMPLE_ESP_WIFI_SSID_AP      "kaluga_caro"
 #define EXAMPLE_ESP_WIFI_PASS_AP      "kalugaucu1"
 
 #define EXAMPLE_ESP_MAXIMUM_RETRY  20
-/* FreeRTOS event group to signal when we are connected*/
-static EventGroupHandle_t s_wifi_event_group;
+
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
  * - we failed to connect after the maximum amount of retries */
@@ -40,39 +52,39 @@ static EventGroupHandle_t s_wifi_event_group;
 static const char *TAG_STA = "wifi station";
 static const char *TAG_AP = "wifi softAP";
 
-static int s_retry_num = 0;
-/* FreeRTOS event group to signal when we are connected/disconnected */
+/* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
 esp_netif_t *esp_netif_ap;
-
 
 /*HTML */
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
-char usuario[32] = "";
-char password[32] = "";
 
 char g_ssid[32] = "";
 char g_password[64] = "";
-//char g_mqtturl[64] = "";
-//char g_mqttport[32] = "";
+char g_mqtturl[64] = "";
+char g_mqttport[32] = "";
 
 char* ssidPr;
 char* passPr;
 
 int connectCheck = 0;
 
+void init_ap(void *pvParameters);
 void init_sta(void *pvParameters);
+int softapsta(void);
 void save_credentials_to_nvs();
+void read_credentials_from_nvs();
+
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED) {
-        wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
+        wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data; //este
         
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-        wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
+        wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;// este 
         
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
@@ -81,7 +93,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
         ESP_LOGI(TAG_STA, "Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
-        s_retry_num = 0;
+        //s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
@@ -98,9 +110,6 @@ esp_netif_t *wifi_init_softap(void)
             .password = EXAMPLE_ESP_WIFI_PASS_AP,
             .max_connection = 4,
             .authmode = WIFI_AUTH_WPA2_PSK,
-            .pmf_cfg = {
-                .required = false,
-            },
         },
     };
 
@@ -115,6 +124,7 @@ esp_netif_t *wifi_init_softap(void)
 
     return esp_netif_ap;
 }
+
 
 /* Initialize wifi station */
 esp_netif_t *wifi_init_sta(void)
@@ -145,6 +155,7 @@ esp_netif_t *wifi_init_sta(void)
     return esp_netif_sta;
 }
 
+// Función archivo HTML
 esp_err_t root_get_handler(httpd_req_t *req)
 {
     extern const uint8_t web_html_start[] asm("_binary_web_html_start");
@@ -158,7 +169,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
 
 esp_err_t config_post_handler(httpd_req_t *req)
 {
-    char buf[100];
+    char buf[1024];//aumento del tamano del buffer
     int ret, remaining = req->content_len;
 
     if (remaining >= sizeof(buf)) {
@@ -179,8 +190,8 @@ esp_err_t config_post_handler(httpd_req_t *req)
 
         if (httpd_query_key_value(buf, "ssid", g_ssid, sizeof(g_ssid)) == ESP_OK &&
             httpd_query_key_value(buf, "password", g_password, sizeof(g_password)) == ESP_OK
-            //&& httpd_query_key_value(buf, "mqqt_url", g_mqtturl, sizeof(g_mqtturl)) == ESP_OK
-           // && httpd_query_key_value(buf, "mqtt_pott", g_mqttport, sizeof(g_mqttport)) == ESP_OK
+            && httpd_query_key_value(buf, "mqtt_url", g_mqtturl, sizeof(g_mqtturl)) == ESP_OK
+           && httpd_query_key_value(buf, "mqtt_pott", g_mqttport, sizeof(g_mqttport)) == ESP_OK
             ) {
 
             save_credentials_to_nvs();
@@ -192,7 +203,10 @@ esp_err_t config_post_handler(httpd_req_t *req)
         remaining -= ret;
     }
 
-    httpd_resp_send(req, "Datos recibidos", HTTPD_RESP_USE_STRLEN);
+  const char* response = "<!DOCTYPE html><html><head><style>body, h4 {font-family: \"Raleway\", Arial, sans-serif;letter-spacing: 6px;text-align: center;vertical-align: -50px;}</style></head><body><h4>Datos recibidos</h1></body></html>";
+
+
+httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
@@ -201,7 +215,10 @@ httpd_handle_t start_webserver()
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
+    config.max_uri_handlers = 16;
+
     if (httpd_start(&server, &config) == ESP_OK) {
+        
         httpd_uri_t root = {
             .uri = "/",
             .method = HTTP_GET,
@@ -222,6 +239,7 @@ httpd_handle_t start_webserver()
     return server;
 }
 
+// Detención del servidor HTTP
 void stop_webserver(httpd_handle_t server)
 {
     if (server) {
@@ -232,31 +250,35 @@ void stop_webserver(httpd_handle_t server)
 void init_ap(void *pvParameters){
 
     while (1) {
+
         if (strlen(g_ssid) > 0 && strlen(g_password) > 0) {
-        
+        printf("Tarea AP inciada \n");
         TaskHandle_t task_handle;
         xTaskCreate(init_sta, "init_sta_task", 1024*2, NULL, 1, &task_handle);
-        vTaskDelete(NULL); // Eliminar la tarea init_ap
+        break;
         }
         
      vTaskDelay(pdMS_TO_TICKS(2000));
     }
+    vTaskDelete(NULL); // Eliminar la tarea init_ap
 }
 
 void init_sta(void *pvParameters) {
 
     while (1) {
+        printf("Tarea init_sta iniciada\n");
         if (strlen(g_ssid) > 0 && strlen(g_password) > 0) {
             printf("usuario: %s  ,contraseña: %s \n",g_ssid,g_password );
             ESP_ERROR_CHECK(esp_wifi_stop() );
            
             wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
             ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+            //esp_netif_destroy(esp_netif_ap);
             ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
 
 
             ESP_LOGI(TAG_STA, "ESP_WIFI_MODE_STA");
-            esp_netif_t *esp_netif_sta = wifi_init_sta();
+            esp_netif_t *esp_netif_sta = wifi_init_sta(); //este se puede borrar
 
             ESP_ERROR_CHECK(esp_wifi_start());
             vTaskDelete(NULL);
@@ -265,7 +287,6 @@ void init_sta(void *pvParameters) {
     
     }
 }
-
 
 int softapsta(void){
     ESP_ERROR_CHECK(esp_netif_init());
@@ -302,7 +323,7 @@ int softapsta(void){
 
     /* Initialize AP */
     ESP_LOGI(TAG_AP, "ESP_WIFI_MODE_AP");
-    esp_netif_t *esp_netif_ap = wifi_init_softap();
+    esp_netif_t *esp_netif_ap = wifi_init_softap(); //este se puede borrar
 
     
     /* Initialize STA */
@@ -358,17 +379,17 @@ void save_credentials_to_nvs() {
         return;
     }
 
-    // err = nvs_set_str(nvs_handle, "mqtturl", g_mqtturl);
-    // if (err != ESP_OK) {
-    //     printf("Error setting MQTT URL to NVS!\n");
-    //     return;
-    // }
+    err = nvs_set_str(nvs_handle, "mqtturl", g_mqtturl);
+    if (err != ESP_OK) {
+        printf("Error setting MQTT URL to NVS!\n");
+        return;
+    }
 
-    //  err = nvs_set_str(nvs_handle, "mqttport", g_mqttport);
-    // if (err != ESP_OK) {
-    //     printf("Error setting MQTT port to NVS!\n");
-    //     return;
-    // }
+     err = nvs_set_str(nvs_handle, "mqttport", g_mqttport);
+    if (err != ESP_OK) {
+        printf("Error setting MQTT port to NVS!\n");
+        return;
+    }
 
     err = nvs_commit(nvs_handle);
     if (err != ESP_OK) {
@@ -378,3 +399,66 @@ void save_credentials_to_nvs() {
 
     nvs_close(nvs_handle);
 }
+
+void read_credentials_from_nvs() {
+    nvs_handle_t nvs_handle;
+    esp_err_t err;
+
+    // Abrir el espacio de almacenamiento NVS
+    err = nvs_open("storage", NVS_READONLY, &nvs_handle);
+    if (err != ESP_OK) {
+        printf("Error al abrir el espacio de almacenamiento NVS\n");
+        return;
+    }
+
+    // Leer los valores de las claves
+    size_t ssid_length = sizeof(g_ssid) - 1;
+    err = nvs_get_str(nvs_handle, "ssid", g_ssid, &ssid_length);
+    if (err != ESP_OK) {
+        printf("Error al leer el valor de la clave 'ssid' desde NVS\n");
+    }
+
+    size_t password_length = sizeof(g_password) - 1;
+    err = nvs_get_str(nvs_handle, "password", g_password, &password_length);
+    if (err != ESP_OK) {
+        printf("Error al leer el valor de la clave 'password' desde NVS\n");
+    }
+
+    size_t mqtturl_length = sizeof(g_mqtturl) - 1;
+    err = nvs_get_str(nvs_handle, "pmqtt_url", g_mqtturl, &mqtturl_length);
+    if (err != ESP_OK) {
+        printf("Error al leer el valor de la clave 'mqtt URL' desde NVS\n");
+    }
+
+     size_t mqttport_length = sizeof(g_mqttport) - 1;
+    err = nvs_get_str(nvs_handle, "pmqtt_port", g_mqttport, &mqttport_length);
+    if (err != ESP_OK) {
+        printf("Error al leer el valor de la clave 'mqtt port' desde NVS\n");
+    }
+
+    printf("DATOS EN NVS \n Usuario: %s, Contraseña: %s \n , MQTT URL: %s, MQTT PORT: %s,\n",g_ssid,g_password,g_mqtturl,g_mqttport );
+    // Cerrar el espacio de almacenamiento NVS
+    nvs_close(nvs_handle);
+}
+
+void app_main(void)
+{
+    esp_log_level_set("mainTest", ESP_LOG_INFO); 
+
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    int staConnect = softapsta(); // seteo y conexión en modo ap y espera a credenciales desde pagina web
+     //delay para esperar conexion a station, mejorar con err check
+
+    if (staConnect == 1)
+    {
+        printf("conexión exitosa, puede seguir \n");
+        vTaskDelay(3000/portTICK_PERIOD_MS);
+    }
+    read_credentials_from_nvs();
+    }

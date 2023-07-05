@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Registro de datos</title>
+        <style>
+            body, h1, input {
+                font-family: "Raleway", Arial, sans-serif;
+            }
+            h1 {
+                letter-spacing: 6px;
+                text-align: center;
+                vertical-align: -50px;
+            }
+            body {
+                background-color: lightgrey;
+                color: rgb(38, 3, 48);
+            }
+            input {
+                font-size: 20px;
+                text-align: center;
+                background-color: lightgrey;
+                color: rgb(62, 7, 78);
+            }
+        </style>
+    </head>
+    <body>
+        <h1>WiFi y MQTT</h1>
+        <form method='POST' action='/config'>
+            <label for='ssid'>Red:</label>
+            <input type='text' id='ssid' name='ssid' autocomplete='ssid'><br>
+            <label for='password'>Password:</label>
+            <input type='password' id='password' name='password'><br>
+            <label for='mqtt_url'>URL del Broker:</label>
+            <input type='text' id='mqtt_url' name='mqtt_url' autocomplete='url'><br>
+            <label for='mqtt_port'>Puerto del Broker:</label>
+            <input type='number' id='mqtt_port' name='mqtt_port' autocomplete='off'><br>
+            <input type="submit" name="connect" value="Conectar"> 
+        </form>
+    </body>
+</html>
