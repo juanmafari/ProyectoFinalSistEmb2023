@@ -169,7 +169,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
 
 esp_err_t config_post_handler(httpd_req_t *req)
 {
-    char buf[1024];//aumento del tamano del buffer
+    char buf[1024];
     int ret, remaining = req->content_len;
 
     if (remaining >= sizeof(buf)) {
@@ -186,27 +186,24 @@ esp_err_t config_post_handler(httpd_req_t *req)
             return ESP_FAIL;
         }
 
-        buf[ret] = '\0';  // Agregar terminador nulo al final del búfer
+        buf[ret] = '\0';
 
         if (httpd_query_key_value(buf, "ssid", g_ssid, sizeof(g_ssid)) == ESP_OK &&
-            httpd_query_key_value(buf, "password", g_password, sizeof(g_password)) == ESP_OK
-            && httpd_query_key_value(buf, "mqtt_url", g_mqtturl, sizeof(g_mqtturl)) == ESP_OK
-           && httpd_query_key_value(buf, "mqtt_pott", g_mqttport, sizeof(g_mqttport)) == ESP_OK
-            ) {
+            httpd_query_key_value(buf, "password", g_password, sizeof(g_password)) == ESP_OK &&
+            httpd_query_key_value(buf, "mqtturl", g_mqtturl, sizeof(g_mqtturl)) == ESP_OK &&
+            httpd_query_key_value(buf, "mqttport", g_mqttport, sizeof(g_mqttport)) == ESP_OK) {
 
             save_credentials_to_nvs();
-             
         } else {
-            return ESP_FAIL;  // Datos del formulario incompletos o incorrectos
+            return ESP_FAIL;
         }
 
         remaining -= ret;
     }
 
-  const char* response = "<!DOCTYPE html><html><head><style>body, h4 {font-family: \"Raleway\", Arial, sans-serif;letter-spacing: 6px;text-align: center;vertical-align: -50px;}</style></head><body><h4>Datos recibidos</h1></body></html>";
+    const char* response = "<!DOCTYPE html><html><head><style>body, h4 {font-family: \"Raleway\", Arial, sans-serif;letter-spacing: 6px;text-align: center;vertical-align: -50px;}</style></head><body><h4>Datos recibidos</h1></body></html>";
 
-
-httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
@@ -218,7 +215,6 @@ httpd_handle_t start_webserver()
     config.max_uri_handlers = 16;
 
     if (httpd_start(&server, &config) == ESP_OK) {
-        
         httpd_uri_t root = {
             .uri = "/",
             .method = HTTP_GET,
@@ -238,6 +234,7 @@ httpd_handle_t start_webserver()
 
     return server;
 }
+
 
 // Detención del servidor HTTP
 void stop_webserver(httpd_handle_t server)
@@ -425,20 +422,21 @@ void read_credentials_from_nvs() {
     }
 
     size_t mqtturl_length = sizeof(g_mqtturl) - 1;
-    err = nvs_get_str(nvs_handle, "pmqtt_url", g_mqtturl, &mqtturl_length);
+    err = nvs_get_str(nvs_handle, "mqtturl", g_mqtturl, &mqtturl_length);
     if (err != ESP_OK) {
-        printf("Error al leer el valor de la clave 'mqtt URL' desde NVS\n");
+        printf("Error al leer el valor de la clave 'mqtturl' desde NVS\n");
     }
 
-     size_t mqttport_length = sizeof(g_mqttport) - 1;
-    err = nvs_get_str(nvs_handle, "pmqtt_port", g_mqttport, &mqttport_length);
+   size_t mqttport_length = sizeof(g_mqttport) - 1;
+    err = nvs_get_str(nvs_handle, "mqttport", g_mqttport, &mqttport_length);
     if (err != ESP_OK) {
-        printf("Error al leer el valor de la clave 'mqtt port' desde NVS\n");
+        printf("Error al leer el valor de la clave 'mqttport' desde NVS\n");
     }
 
     printf("DATOS EN NVS \n Usuario: %s, Contraseña: %s \n , MQTT URL: %s, MQTT PORT: %s,\n",g_ssid,g_password,g_mqtturl,g_mqttport );
     // Cerrar el espacio de almacenamiento NVS
     nvs_close(nvs_handle);
+    
 }
 
 void app_main(void)
