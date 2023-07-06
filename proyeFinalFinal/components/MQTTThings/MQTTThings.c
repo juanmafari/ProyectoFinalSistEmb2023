@@ -15,27 +15,31 @@
 #include "mqtt_client.h"
 #include "MQTTThings.h"
 #include "cJSON.h"
+#include "nvs_flash.h"
 
-#define BROKER_URL "mqtt://demo.thingsboard.io"
-#define BROKER_PORT 1883
+//#define BROKER_URL "mqtt://demo.thingsboard.io"
+//#define BROKER_PORT 1883
 #define TOPIC "v1/devices/me/telemetry"
 #define BROKER_USER "ncjxeg28pxsrauzpwx8v"
 #define BROKER_PASS ""
-
 
 
 static const char *TAG = "MQTT_EXAMPLE";
 
 esp_mqtt_client_handle_t client;
 
-static void log_error_if_nonzero(const char *message, int error_code)
+char c_mqtturl[256]="";
+char c_mqttport[20]="";
+
+
+void log_error_if_nonzero(const char *message, int error_code)
 {
     if (error_code != 0) {
         ESP_LOGE(TAG, "Last error %s: 0x%x", message, error_code);
     }
 }
 
-static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%" PRIi32 "", base, event_id);
     esp_mqtt_event_handle_t event = event_data;
@@ -94,30 +98,65 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 
 
-void publish_telemetry( const char* data)
+int publish_telemetry( const char* data)
 {
-    esp_mqtt_client_publish(client, TOPIC, data, strlen(data), 1, 1);
+    return esp_mqtt_client_publish(client, TOPIC, data, strlen(data), 1, 1);
 }
 
-
+void configMQTT(void){
+    char mqttURL[100] = "mqtt://";
+    strcat(mqttURL, c_mqtturl);
+    printf("datoo %s \n",mqttURL);
+    mqttURL[sizeof(mqttURL) - 1] = '\0';
+    esp_mqtt_client_config_t mqtt_cfg = {
+        .broker.address.uri = (char*)mqttURL,
+        .broker.address.port = strtoul(c_mqttport, NULL, 10),
+        .credentials.username = BROKER_USER,
+        .credentials.authentication.password = BROKER_PASS,
+    }; 
+    client = esp_mqtt_client_init(&mqtt_cfg);
+    esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+    esp_mqtt_client_start(client);
+}
 
 void mqtt_app_start(void)
 {
     
+    nvs_handle_t nvs_handle;
+    esp_err_t err;
+    // Abrir el espacio de almacenamiento NVS
+    err = nvs_open("storage", NVS_READONLY, &nvs_handle);
+    if (err != ESP_OK) {
+        printf("Error al abrir el espacio de almacenamiento NVS\n");
+        return;
+    }
+    // Leer los valores de las claves
+    size_t mqtturl_length = sizeof(c_mqtturl) - 1;
+    err = nvs_get_str(nvs_handle, "mqtturl", c_mqtturl, &mqtturl_length);
+    if (err != ESP_OK) {
+        printf("Error al leer el valor de la clave 'mqtt URL' desde NVS\n");
+    }
+
+     size_t mqttport_length = sizeof(c_mqttport) - 1;
+    err = nvs_get_str(nvs_handle, "mqttport", c_mqttport, &mqttport_length);
+    if (err != ESP_OK) {
+        printf("Error al leer el valor de la clave 'mqtt port' desde NVS\n");
+    }
+
+    printf("DATOS EN NVS \n MQTT URL: %s, MQTT PORT: %s,\n",c_mqtturl,c_mqttport );
+    // Cerrar el espacio de almacenamiento NVS
+    nvs_close(nvs_handle);  // El arreglo de caracteres donde se almacenará la cadena
+
+// Utilizar sprintf() para convertir el número entero a una cadena de caracteres
+    //sprintf(porto, "%d", c_mqttport);
 
     
-    esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = BROKER_URL,
-        .broker.address.port = BROKER_PORT,
-        .credentials.username = BROKER_USER,
-        .credentials.authentication.password = BROKER_PASS,
-        
 
-    };
+    configMQTT();
+    //strncpy((char*)mqtt_cfg.broker.address.uri, c_mqtturl, sizeof(mqtt_cfg.broker.address.uri));
+    //strncpy((char*)mqtt_cfg.broker.address.port, c_mqttport, sizeof(mqtt_cfg.broker.address.port));
 
-    client = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
-    esp_mqtt_client_start(client);
+    
     
 }
 

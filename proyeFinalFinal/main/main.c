@@ -30,6 +30,7 @@ int* buffer;
 time_t* timestamps;
 int buffer_index = 0;
 int buffer_count = 0;
+int publish_index = 0;
 QueueHandle_t queue_value;
 
 void value_queue_task(void* pParam); //tarea que envia el valor a la cola y lo imprime
@@ -64,7 +65,7 @@ void logger_task(void* pParam)
     struct tm* timeinfo;
     int tiempoprueba;
     long long valueNtimeRX[2];
-    char mensajeThi[90];
+    
     
     while (1)
     {
@@ -74,19 +75,53 @@ void logger_task(void* pParam)
             
             buffer[buffer_index] = valueNtimeRX[0];
             timestamps[buffer_index] = valueNtimeRX[1];
-            //tiempoprueba = valueNtimeRX[1];
+            
+            
+            printf("Medida almacenada - Valor: %lld, tiempo: %lld \n", valueNtimeRX[0], valueNtimeRX[1]);
             
             buffer_index = (buffer_index + 1) % BUFFER_SIZE;
             if (buffer_count < BUFFER_SIZE)
             {
                 buffer_count++;
+                printf("count %d",buffer_count);
             }
-            printf("Medida almacenada - Valor: %lld, tiempo: %lld \n", valueNtimeRX[0], valueNtimeRX[1]);
-            
-            memset(mensajeThi, 0, 90);
-            sprintf(mensajeThi,"{\"ts\": %lld, \"values\":{\"temperature\": %lld}}" ,valueNtimeRX[1], valueNtimeRX[0]);
-            publish_telemetry(mensajeThi);
         }
+    }
+}
+
+void publish_task(void* pParam)
+{
+    char mensajeThi[90];
+    char last_index[50];
+    while (1)
+    {
+        memset(mensajeThi, 0, 90);
+        sprintf(mensajeThi,"{\"ts\": %lld, \"values\":{\"temperature\": %d}}" , timestamps[publish_index],buffer[publish_index]);
+        if (buffer_index != last_index){
+            if (publish_telemetry(mensajeThi) != -1 ){
+            
+            printf("Medida de buffer %d recibida por broker \n", publish_index);
+            
+                
+            } else {
+                printf("Medida de buffer %d no recibida por broker, esperando a condiciones \n", buffer_index);
+                while(publish_telemetry(mensajeThi) == -1){
+                    
+                }
+            }
+            if (publish_index <= buffer_index)
+            {
+                //last_index = publish_index;
+                publish_index = (publish_index + 1) % BUFFER_SIZE;
+                
+            }
+        }
+        
+        
+        
+        
+
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
 
@@ -142,7 +177,7 @@ void app_main(void)
     
     queue_value = xQueueCreate(queue_value_size, 100);
 	initialize_buffer();
-    xTaskCreate(value_queue_task, "sensor_value_task", 1024*2, NULL, 10, NULL);
+    xTaskCreate(value_queue_task, "sensor_value_task", 1024, NULL, 10, NULL);
 	xTaskCreate(logger_task, "logger_task", 1024*2, NULL, 11, NULL);
     
     

@@ -20,11 +20,21 @@
     <body>
         <h1>Conectarse a una red</h1>
         <form method='POST' action='/config'>
+            <div>
             <label for='ssid'>Usuario:</label>
             <input type='text' id='ssid' name='ssid'><br>
             <label for='password'>Password:</label>
             <input type='password' id='password' name='password'><br>
+            <label for='mqtt_url'>URL del Broker:</label>
+            <input type='text' id='mqtt_url' name='mqtt_url'><br>
+            <label for='mqtt_port'>Puerto del Broker:</label>
+            <input type='number' id='mqtt_port' name='mqtt_port'><br>
             <input type="submit" name="connect" value="Conectar"> 
+            </div>
+            <br>
+            <div>
+            <button type="submit" name="button" value="Ejecutar">Borrar antiguas credenciales</button>
+            </div>
         </form>
     </body>
 </html>

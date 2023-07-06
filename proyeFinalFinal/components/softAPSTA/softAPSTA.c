@@ -27,7 +27,7 @@
 #define EXAMPLE_ESP_WIFI_SSID_AP      "kaluga_juan"
 #define EXAMPLE_ESP_WIFI_PASS_AP      "kalugaucu1"
 
-#define EXAMPLE_ESP_MAXIMUM_RETRY  20
+#define EXAMPLE_ESP_MAXIMUM_RETRY  3
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
 /* The event group allows multiple bits for each event, but we only care about two events:
@@ -43,6 +43,7 @@ static int s_retry_num = 0;
 /* FreeRTOS event group to signal when we are connected/disconnected */
 static EventGroupHandle_t s_wifi_event_group;
 esp_netif_t *esp_netif_ap;
+esp_netif_t *esp_netif_sta;
 
 
 /*HTML */
@@ -54,12 +55,23 @@ char password[32] = "";
 char g_ssid[32] = "";
 char g_password[64] = "";
 
+char c_ssid[32] = "";
+char c_password[64] = "";
+
+char g_mqtturl[256]="";
+char g_mqttport[20]="";
+
 char* ssidPr;
 char* passPr;
 
 int connectCheck = 0;
 
 void init_sta(void *pvParameters);
+void save_credentials_to_nvs();
+void read_credentials_from_nvs();
+void erase_credentials_from_nvs();
+void save_certifiedcredentials_to_nvs();
+void reCredentials();
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
@@ -73,17 +85,60 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
         ESP_LOGI(TAG_STA, "Station started");
-        connectCheck = 1;
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
         ESP_LOGI(TAG_STA, "Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        // Manejar evento de desconexión de la estación con un error de conexión
+        wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *) event_data;
+        if (event->reason == WIFI_REASON_AUTH_FAIL) {
+            // Autenticación fallida (contraseña o SSID incorrectos)
+            ESP_LOGE(TAG_STA, "Authentication failed. Incorrect password or SSID.");
+            erase_credentials_from_nvs();
+            reCredentials();
+        } else if (event->reason == WIFI_REASON_NO_AP_FOUND) {
+            // Autenticación fallida (contraseña o SSID incorrectos)
+            ESP_LOGE(TAG_STA, "AP no encontrada.");
+            if (g_ssid == c_ssid && g_password == c_password){
+                while (1){
+                    esp_err_t errReconne = esp_wifi_connect();
+                    if (errReconne == ESP_OK)
+                    {
+                        break;
+                    }
+                }
+            } else{
+                erase_credentials_from_nvs();
+                reCredentials();
+            }
+        } else if (event->reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT) {
+            // Autenticación fallida (contraseña incorrecta)
+            ESP_LOGE(TAG_STA, "Authentication failed. Incorrect password or SSID.");
+            erase_credentials_from_nvs();
+            reCredentials();
+        } else {
+            // Otro error de conexión
+            ESP_LOGE(TAG_STA, "Connection failed. Reason: %d", event->reason);
+            reCredentials();
+        } 
+        
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
+        // Manejar evento de conexión exitosa de la estación
+            save_certifiedcredentials_to_nvs();
+            ESP_LOGI(TAG_STA, "Station connected to Wi-Fi successfully.");
+            connectCheck = 1;
     }
 }
 
+
 esp_netif_t *wifi_init_softap(void)
 {
+    if (esp_netif_ap != NULL) {
+                esp_netif_destroy(esp_netif_ap);
+                esp_netif_ap = NULL;
+    }
     esp_netif_ap = esp_netif_create_default_wifi_ap();
 
     wifi_config_t wifi_ap_config = {
@@ -115,7 +170,11 @@ esp_netif_t *wifi_init_softap(void)
 /* Initialize wifi station */
 esp_netif_t *wifi_init_sta(void)
 {
-    esp_netif_t *esp_netif_sta = esp_netif_create_default_wifi_sta();
+    if (esp_netif_sta != NULL) {
+                esp_netif_destroy(esp_netif_sta);
+                esp_netif_sta = NULL;
+    }
+    esp_netif_sta = esp_netif_create_default_wifi_sta();
 
     wifi_config_t wifi_sta_config = {
         .sta = {
@@ -154,36 +213,62 @@ esp_err_t root_get_handler(httpd_req_t *req)
 
 esp_err_t config_post_handler(httpd_req_t *req)
 {
-    char buf[100];
+    /* Prepare a buffer to store the message */
+    char buf[256];
     int ret, remaining = req->content_len;
 
-    if (remaining >= sizeof(buf)) {
-        httpd_resp_send_err(req, HTTPD_414_URI_TOO_LONG, "Payload Too Large");
-        return ESP_FAIL;
-    }
-
+    /* Log data received */
+    ESP_LOGI(TAG_STA, "=========== RECEIVED DATA ==========");
     while (remaining > 0) {
-        ret = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)));
-        if (ret <= 0) {
+        /* Read the data for the request */
+        if ((ret = httpd_req_recv(req, buf, sizeof(buf))) <= 0) {
             if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-                httpd_resp_send_408(req);
+                /* Retry receiving if timeout occurred */
+                continue;
             }
+            /* In case of error, break and close connection */
             return ESP_FAIL;
         }
 
-        buf[ret] = '\0';  // Agregar terminador nulo al final del búfer
-
-        if (httpd_query_key_value(buf, "ssid", g_ssid, sizeof(g_ssid)) == ESP_OK &&
-                httpd_query_key_value(buf, "password", g_password, sizeof(g_password)) == ESP_OK) {
-             
-        } else {
-            return ESP_FAIL;  // Datos del formulario incompletos o incorrectos
-        }
+        /* Log data received */
+        ESP_LOGI(TAG_STA, "%.*s", ret, buf);
 
         remaining -= ret;
     }
+    ESP_LOGI(TAG_STA, "=========== END ==========");
 
-    httpd_resp_send(req, "Datos recibidos", HTTPD_RESP_USE_STRLEN);
+    // Store the received data in g_ssid, g_password, g_mqtt_url, and g_mqtt_port
+    if (httpd_query_key_value(buf, "ssid", g_ssid, sizeof(g_ssid)) == ESP_OK &&
+                httpd_query_key_value(buf, "password", g_password, sizeof(g_password)) == ESP_OK){
+                    if (httpd_query_key_value(buf, "mqtt_url", g_mqtturl, sizeof(g_mqtturl)) == ESP_OK && 
+                httpd_query_key_value(buf, "mqtt_port", g_mqttport, sizeof(g_mqttport)) == ESP_OK)
+                    {
+                        /* code */
+                    }
+                    
+                
+    } else {
+            return ESP_FAIL;  // Datos del formulario incompletos o incorrectos
+    }  
+
+
+    save_credentials_to_nvs();
+
+    char button_value[32];
+    if (httpd_query_key_value(buf, "button", button_value, sizeof(button_value)) == ESP_OK)
+    {
+        if (strcmp(button_value, "Ejecutar") == 0)
+        {
+            erase_credentials_from_nvs();
+        }
+    }
+
+    // ...
+
+    return ESP_OK;
+
+    
+
     return ESP_OK;
 }
 
@@ -221,7 +306,7 @@ void stop_webserver(httpd_handle_t server)
 }
 
 void init_ap(void *pvParameters){
-
+    
     while (1) {
         if (strlen(g_ssid) > 0 && strlen(g_password) > 0) {
         
@@ -238,9 +323,9 @@ void init_sta(void *pvParameters) {
 
     while (1) {
         if (strlen(g_ssid) > 0 && strlen(g_password) > 0) {
-            printf("usuario: %s  ,contraseña: %s \n",g_ssid,g_password );
+            printf("ssid: %s  ,contraseña: %s \n",g_ssid,g_password );
             ESP_ERROR_CHECK(esp_wifi_stop() );
-           
+            
             wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
             ESP_ERROR_CHECK(esp_wifi_init(&cfg));
             //esp_netif_destroy(esp_netif_ap);
@@ -258,7 +343,32 @@ void init_sta(void *pvParameters) {
     }
 }
 
+void reCredentials(void){
+    /*read_credentials_from_nvs();
+    save_certifiedcredentials_to_nvs();
+    printf("ssid: %s  ,contraseña: %s \n",g_ssid,g_password );
+    ESP_ERROR_CHECK(esp_wifi_stop() );
+    
+    
+           
+    wifi_init_config_t cfgRe = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfgRe));
 
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+
+    // Initialize AP 
+    ESP_LOGI(TAG_AP, "ESP_WIFI_MODE_AP");
+    esp_netif_t *esp_netif_ap = wifi_init_softap();
+
+    
+    // Initialize STA 
+    TaskHandle_t task_handle;
+    xTaskCreate(init_ap, "init_ap_task", 1024, NULL, 1, &task_handle);
+
+    // Start WiFi 
+    ESP_ERROR_CHECK(esp_wifi_start() );*/
+    esp_restart();
+}
 
 
 int softapsta(void){
@@ -272,7 +382,7 @@ int softapsta(void){
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-
+    read_credentials_from_nvs();
     /* Initialize event group */
     s_wifi_event_group = xEventGroupCreate();
 
@@ -301,7 +411,7 @@ int softapsta(void){
     
     /* Initialize STA */
     TaskHandle_t task_handle;
-    xTaskCreate(init_ap, "init_ap_task", configMINIMAL_STACK_SIZE, NULL, 1, &task_handle);
+    xTaskCreate(init_ap, "init_ap_task", 1024, NULL, 1, &task_handle);
 
     /* Start WiFi */
     
@@ -327,3 +437,187 @@ int softapsta(void){
     
 }
 
+void erase_credentials_from_nvs(){
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_flash_init();
+    if (err != ESP_OK) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ESP_ERROR_CHECK(nvs_flash_init());
+    }
+    err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        printf("Error opening NVS handle!\n");
+        return;
+    }
+    err = nvs_erase_key(nvs_handle, "ssid");
+    if (err == ESP_OK) {
+        printf("ssid borrada desde nvs \n");
+    }
+    err = nvs_erase_key(nvs_handle, "password");
+    if (err == ESP_OK) {
+        printf("password borrada desde nvs \n");
+    }
+    err = nvs_erase_key(nvs_handle, "mqtturl");
+    if (err == ESP_OK) {
+        printf("mqtturl borrada desde nvs \n");
+    }
+    err = nvs_erase_key(nvs_handle, "mqttport");
+    if (err == ESP_OK) {
+        printf("mqttport borrada desde nvs \n");
+    }
+    err = nvs_erase_key(nvs_handle, "ssidCertified");
+    if (err == ESP_OK) {
+        printf("ultimo ssid borrado desde nvs \n");
+    }
+    err = nvs_erase_key(nvs_handle, "passwordCertified");
+    if (err == ESP_OK) {
+        printf("ultima password borrada desde nvs \n");
+    }
+    err = nvs_commit(nvs_handle);
+    if (err != ESP_OK) {
+        printf("Error committing NVS data!\n");
+        return;
+    }
+
+    nvs_close(nvs_handle);
+}
+
+void save_credentials_to_nvs() {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_flash_init();
+
+    if (err != ESP_OK) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ESP_ERROR_CHECK(nvs_flash_init());
+    }
+    err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        printf("Error opening NVS handle!\n");
+        return;
+    }
+    err = nvs_set_str(nvs_handle, "ssid", g_ssid);
+    if (err != ESP_OK) {
+        printf("Error setting SSID to NVS!\n");
+        return;
+    }
+    err = nvs_set_str(nvs_handle, "password", g_password);
+    if (err != ESP_OK) {
+        printf("Error setting password to NVS!\n");
+        return;
+    }
+    err = nvs_set_str(nvs_handle, "mqtturl", g_mqtturl);
+    if (err != ESP_OK) {
+        printf("Error setting MQTT URL to NVS!\n");
+        return;
+    }
+    err = nvs_set_str(nvs_handle, "mqttport", g_mqttport);
+    if (err != ESP_OK) {
+        printf("Error setting MQTT port to NVS!\n");
+        return;
+    }
+    err = nvs_commit(nvs_handle);
+    if (err != ESP_OK) {
+        printf("Error committing NVS data!\n");
+        return;
+    }
+
+    nvs_close(nvs_handle);
+}
+
+void read_credentials_from_nvs() {
+    nvs_handle_t nvs_handle;
+    esp_err_t err;
+
+    // Abrir el espacio de almacenamiento NVS
+    err = nvs_open("storage", NVS_READONLY, &nvs_handle);
+    if (err != ESP_OK) {
+        printf("Error al abrir el espacio de almacenamiento NVS\n");
+        return;
+    }
+
+    // Leer los valores de las claves
+    size_t ssid_length = sizeof(g_ssid) - 1;
+    err = nvs_get_str(nvs_handle, "ssid", g_ssid, &ssid_length);
+    if (err != ESP_OK) {
+        printf("Error al leer el valor de la clave 'ssid' desde NVS\n");
+        for (int i = 0; i < sizeof(g_ssid); i++) {
+            g_ssid[i] = '\0';
+        }
+    }
+
+    size_t password_length = sizeof(g_password) - 1;
+    err = nvs_get_str(nvs_handle, "password", g_password, &password_length);
+    if (err != ESP_OK) {
+        printf("Error al leer el valor de la clave 'password' desde NVS\n");
+        for (int i = 0; i < sizeof(g_ssid); i++) {
+            g_password[i] = '\0';
+        }
+    }
+
+    size_t mqtturl_length = sizeof(g_mqtturl) - 1;
+    err = nvs_get_str(nvs_handle, "mqtturl", g_mqtturl, &mqtturl_length);
+    if (err != ESP_OK) {
+        printf("Error al leer el valor de la clave 'mqtt URL' desde NVS\n");
+        for (int i = 0; i < sizeof(g_ssid); i++) {
+            g_mqtturl[i] = '\0';
+        }
+    }
+
+     size_t mqttport_length = sizeof(g_mqttport) - 1;
+    err = nvs_get_str(nvs_handle, "mqttport", g_mqttport, &mqttport_length);
+    if (err != ESP_OK) {
+        printf("Error al leer el valor de la clave 'mqtt port' desde NVS\n");
+        for (int i = 0; i < sizeof(g_ssid); i++) {
+            g_mqttport[i] = '\0';
+        }
+    }
+
+    printf("DATOS EN NVS \n Usuario: %s, Contraseña: %s \n , MQTT URL: %s, MQTT PORT: %s,\n",g_ssid,g_password,g_mqtturl,g_mqttport );
+    // Cerrar el espacio de almacenamiento NVS
+    nvs_close(nvs_handle);
+}
+
+void save_certifiedcredentials_to_nvs() {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_flash_init();
+
+    if (err != ESP_OK) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ESP_ERROR_CHECK(nvs_flash_init());
+    }
+    err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        printf("Error opening NVS handle!\n");
+        return;
+    }
+    err = nvs_set_str(nvs_handle, "ssidCertified", g_ssid);
+    if (err != ESP_OK) {
+        printf("Error setting certified SSID to NVS!\n");
+        return;
+    }
+    err = nvs_set_str(nvs_handle, "passwordCertified", g_password);
+    if (err != ESP_OK) {
+        printf("Error setting certified password to NVS!\n");
+        return;
+    }
+
+    size_t c_ssid_length = sizeof(c_ssid) - 1;
+    err = nvs_get_str(nvs_handle, "ssid", c_ssid, &c_ssid_length);
+    if (err != ESP_OK) {
+        printf("Error al leer el valor de la clave 'ssid' desde NVS\n");
+    }
+
+    size_t c_password_length = sizeof(c_password) - 1;
+    err = nvs_get_str(nvs_handle, "password", c_password, &c_password_length);
+    if (err != ESP_OK) {
+        printf("Error al leer el valor de la clave 'password' desde NVS\n");
+    }
+    
+    err = nvs_commit(nvs_handle);
+    if (err != ESP_OK) {
+        printf("Error committing NVS data!\n");
+        return;
+    }
+
+    nvs_close(nvs_handle);
+}
